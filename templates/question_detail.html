@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ question.title }} - StackIt{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ question.title }}</li>
+        </ol>
+    </nav>
+    <div class="mb-4 p-3 bg-white rounded shadow-sm">
+        <div class="d-flex align-items-center flex-wrap mb-2">
+            {% for tag in question.tags %}
+            <span class="badge bg-primary tag-badge me-1 mb-1">{{ tag.tag.name }}</span>
+            {% endfor %}
+            <span class="fw-bold ms-2 fs-5">{{ question.title }}</span>
+        </div>
+        <div class="text-muted small mb-2">
+            <i class="bi bi-person"></i> {{ question.author.name }}
+            <span class="mx-1">·</span>
+            <i class="bi bi-calendar"></i> {{ question.created_at.strftime('%Y-%m-%d %H:%M') }}
+        </div>
+        <div class="question-description mb-2">{{ question.description|safe }}</div>
+    </div>
+    <div class="mb-4">
+        <h6>Answers ({{ answers|length }})</h6>
+        <div id="answersContainer">
+            {% for answer in answers %}
+            <div class="card mb-2 {% if answer.is_accepted %}answer-accepted{% endif %}">
+                <div class="card-body d-flex align-items-start">
+                    <div class="me-3 text-center">
+                        <form method="POST" action="{{ url_for('vote_answer', answer_id=answer.id) }}">
+                            <input type="hidden" name="vote_type" value="upvote">
+                            <button class="vote-btn" type="submit"><i class="bi bi-caret-up-fill"></i></button>
+                        </form>
+                        <div class="vote-count">{{ answer.votes|length }}</div>
+                        <form method="POST" action="{{ url_for('vote_answer', answer_id=answer.id) }}">
+                            <input type="hidden" name="vote_type" value="downvote">
+                            <button class="vote-btn" type="submit"><i class="bi bi-caret-down-fill"></i></button>
+                        </form>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="answer-content">{{ answer.description|safe }}</div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                {{ answer.author.name }} • {{ answer.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if answer.is_accepted %} • <span class="text-success"><i class="bi bi-check-circle"></i> Accepted</span>{% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% if current_user.is_authenticated %}
+    <div id="answerForm" class="mb-2">
+        <h6>Submit Your Answer</h6>
+        <form method="POST" action="{{ url_for('create_answer', question_id=question.id) }}" id="answerFormEl">
+            <div id="answerEditor" style="height: 150px;"></div>
+            <input type="hidden" name="description" id="answerDescriptionInput">
+            <div class="mt-2">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i> Submit</button>
+            </div>
+        </form>
+    </div>
+    <script>
+        let answerQuill;
+        document.addEventListener('DOMContentLoaded', function() {
+            answerQuill = new Quill('#answerEditor', {
+                theme: 'snow',
+                placeholder: 'Write your answer...',
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline'],
+                        ['code-block', 'blockquote'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['link']
+                    ]
+                }
+            });
+            document.getElementById('answerFormEl').onsubmit = function(e) {
+                document.getElementById('answerDescriptionInput').value = answerQuill.root.innerHTML;
+            };
+        });
+    </script>
+    {% else %}
+    <div class="alert alert-warning">Please <a href="{{ url_for('login') }}">login</a> to submit an answer or vote.</div>
+    {% endif %}
+</div>
+{% endblock %} 

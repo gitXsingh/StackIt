@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Ask a Question - StackIt{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4"><i class="bi bi-question-circle"></i> Ask a Question</h2>
+    <form method="POST" id="askQuestionForm">
+        <div class="mb-3">
+            <label for="questionTitle" class="form-label">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="questionTitle" name="title" required placeholder="What's your question? Be specific.">
+            <div class="form-text">Minimum 10 characters</div>
+        </div>
+        <div class="mb-3">
+            <label for="questionDescription" class="form-label">Description <span class="text-danger">*</span></label>
+            <div id="questionEditor" style="height: 200px;"></div>
+            <input type="hidden" name="description" id="descriptionInput">
+            <div class="form-text">Minimum 20 characters</div>
+        </div>
+        <div class="mb-3">
+            <label for="questionTags" class="form-label">Tags</label>
+            <select class="form-select" id="questionTags" name="tags" multiple>
+                {% for tag in tags %}
+                <option value="{{ tag.name }}">{{ tag.name }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text">Select relevant tags to help others find your question.</div>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Post Question</button>
+    </form>
+</div>
+<script>
+    let quill;
+    document.addEventListener('DOMContentLoaded', function() {
+        quill = new Quill('#questionEditor', {
+            theme: 'snow',
+            placeholder: 'Describe your question in detail...',
+            modules: {
+                toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    ['code-block', 'blockquote'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['link']
+                ]
+            }
+        });
+        document.getElementById('askQuestionForm').onsubmit = function(e) {
+            document.getElementById('descriptionInput').value = quill.root.innerHTML;
+        };
+    });
+</script>
+{% endblock %} 

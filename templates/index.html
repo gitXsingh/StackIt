@@ -15,11 +15,11 @@
                     A minimal Q&A forum for structured, community-based learning. 
                     Ask questions, share knowledge, and build your expertise.
                 </p>
-                {% if current_user.is_authenticated %}
-                    <button class="btn btn-light btn-lg" onclick="showAskQuestionModal()">
+                {% if questions|length == 0 and current_user.is_authenticated %}
+                    <a class="btn btn-light btn-lg" href="{{ url_for('ask_question') }}">
                         <i class="bi bi-plus-circle"></i> Ask Your First Question
-                    </button>
-                {% else %}
+                    </a>
+                {% elif not current_user.is_authenticated %}
                     <a href="{{ url_for('register') }}" class="btn btn-light btn-lg me-3">
                         <i class="bi bi-person-plus"></i> Get Started
                     </a>
@@ -40,16 +40,27 @@
     <!-- Filters, Search, and Ask Button Row -->
     <div class="row align-items-center mb-3 flex-wrap gx-2 gy-2">
         <div class="col-auto mb-2 mb-md-0">
-            <button class="btn btn-primary px-4" onclick="showAskQuestionModal()">
+            <a class="btn btn-primary px-4" href="{{ url_for('ask_question') }}">
                 <i class="bi bi-plus-circle"></i> Ask Question
-            </button>
+            </a>
         </div>
         <div class="col-auto mb-2 mb-md-0">
             <div class="btn-group" role="group" aria-label="Filters">
                 <button type="button" class="btn btn-outline-secondary active filter-pill" id="filterNewest" onclick="setFilter('newest')">Newest</button>
                 <button type="button" class="btn btn-outline-secondary filter-pill" id="filterUnanswered" onclick="setFilter('unanswered')">Unanswered</button>
-                <button type="button" class="btn btn-outline-secondary filter-pill" id="filterMore" onclick="setFilter('more')">More</button>
+                <button type="button" class="btn btn-outline-secondary filter-pill dropdown-toggle" id="filterMore" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+                <ul class="dropdown-menu" aria-labelledby="filterMore">
+                    <li><a class="dropdown-item" href="#" onclick="setFilter('oldest')">Oldest</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setFilter('most_answers')">Most Answers</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setFilter('most_votes')">Most Votes</a></li>
+                </ul>
             </div>
+        </div>
+        <div class="col-auto mb-2 mb-md-0">
+            <select class="form-select" id="tagFilter" onchange="filterByTag()">
+                <option value="">All Tags</option>
+                <!-- Tag options will be loaded dynamically -->
+            </select>
         </div>
         <div class="col flex-grow-1 mb-2 mb-md-0">
             <div class="input-group">
@@ -63,11 +74,16 @@
 
     <!-- Questions List -->
     <div id="questionsContainer">
-        <div class="text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        {% if questions|length == 0 %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+                <h4 class="mt-3">No questions found</h4>
+                <p class="text-muted">Try adjusting your search criteria or be the first to ask a question!</p>
+                <a class="btn btn-primary" href="{{ url_for('ask_question') }}">
+                    <i class="bi bi-plus-circle"></i> Ask Question
+                </a>
             </div>
-        </div>
+        {% endif %}
     </div>
 
     <!-- Pagination -->
@@ -116,62 +132,6 @@
     }
 </style>
 
-<!-- Ask Question Modal -->
-<div class="modal fade" id="askQuestionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-question-circle"></i> Ask a Question
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="askQuestionForm">
-                    <div class="mb-3">
-                        <label for="questionTitle" class="form-label">Title <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="questionTitle" required 
-                               placeholder="What's your question? Be specific.">
-                        <div class="form-text">Minimum 10 characters</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="questionDescription" class="form-label">Description <span class="text-danger">*</span></label>
-                        <div id="questionEditor" style="height: 200px;"></div>
-                        <div class="form-text">Minimum 20 characters</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="questionTags" class="form-label">Tags</label>
-                        <select class="form-select" id="questionTags" multiple>
-                            <!-- Tags will be loaded dynamically -->
-                        </select>
-                        <div class="form-text">Select relevant tags to help others find your question.</div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitQuestion()">
-                    <i class="bi bi-send"></i> Post Question
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Question Detail Modal -->
-<div class="modal fade" id="questionDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="questionDetailTitle"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="questionDetailBody">
-                <!-- Content will be loaded dynamically -->
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -260,7 +220,7 @@
         }
 
         container.innerHTML = questionsToShow.map(question => `
-            <div class="question-list-row d-flex align-items-center justify-content-between py-3 px-2 mb-2 bg-white rounded shadow-sm flex-wrap" style="cursor:pointer;" onclick="showQuestionDetail(${question.id})">
+            <a class="question-list-row d-flex align-items-center justify-content-between py-3 px-2 mb-2 bg-white rounded shadow-sm flex-wrap text-decoration-none text-dark" style="cursor:pointer;" href="/question/${question.id}">
                 <div class="flex-grow-1">
                     <div class="d-flex align-items-center flex-wrap mb-1">
                         ${(question.tags && question.tags.length > 0) ? question.tags.map(tag => `
@@ -278,7 +238,7 @@
                 <div class="ms-3 text-center">
                     <span class="badge bg-secondary fs-6">${question.answers_count} <i class="bi bi-chat"></i></span>
                 </div>
-            </div>
+            </a>
         `).join('');
         // Render HTML previews after insertion
         const previewEls = document.querySelectorAll('.preview-html');
