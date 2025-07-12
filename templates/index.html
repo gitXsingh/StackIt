@@ -384,41 +384,35 @@
         fetch(`/api/questions/${questionId}`)
             .then(response => response.json())
             .then(question => {
-                document.getElementById('questionDetailTitle').textContent = question.title;
-                
+                document.getElementById('questionDetailTitle').textContent = '';
                 const body = document.getElementById('questionDetailBody');
                 body.innerHTML = `
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <span class="badge bg-secondary">${escapeHtml(question.author)}</span>
-                                <small class="text-muted ms-2">${formatDate(question.created_at)}</small>
-                            </div>
-                            <div>
-                                ${question.tags.map(tag => `
-                                    <span class="badge bg-primary">${escapeHtml(tag)}</span>
-                                `).join('')}
-                            </div>
+                    <nav aria-label="breadcrumb" class="mb-2">
+                        <ol class="breadcrumb small">
+                            <li class="breadcrumb-item"><a href="#" onclick="$('.modal').modal('hide')">Home</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">${escapeHtml(question.title)}</li>
+                        </ol>
+                    </nav>
+                    <div class="mb-3 p-3 bg-white rounded shadow-sm">
+                        <div class="d-flex align-items-center flex-wrap mb-2">
+                            ${(question.tags && question.tags.length > 0) ? question.tags.map(tag => `
+                                <span class="badge bg-primary tag-badge me-1 mb-1">${escapeHtml(tag)}</span>
+                            `).join('') : ''}
+                            <span class="fw-bold ms-2 fs-5">${escapeHtml(question.title)}</span>
                         </div>
-                        <div class="question-description">${question.description}</div>
+                        <div class="text-muted small mb-2">
+                            <i class="bi bi-person"></i> ${escapeHtml(question.author)}
+                            <span class="mx-1">·</span>
+                            <i class="bi bi-calendar"></i> ${formatDate(question.created_at)}
+                        </div>
+                        <div class="question-description mb-2">${question.description}</div>
                     </div>
-                    
-                    <hr>
-                    
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="mb-3">
                         <h6>Answers (${question.answers.length})</h6>
-                        {% if current_user.is_authenticated %}
-                            <button class="btn btn-primary btn-sm" onclick="showAnswerForm(${question.id})">
-                                <i class="bi bi-plus-circle"></i> Add Answer
-                            </button>
-                        {% endif %}
-                    </div>
-                    
-                    <div id="answersContainer">
-                        ${question.answers.map(answer => `
-                            <div class="card mb-3 ${answer.is_accepted ? 'answer-accepted' : ''}">
-                                <div class="card-body">
-                                    <div class="d-flex">
+                        <div id="answersContainer">
+                            ${question.answers.map(answer => `
+                                <div class="card mb-2 ${answer.is_accepted ? 'answer-accepted' : ''}">
+                                    <div class="card-body d-flex align-items-start">
                                         <div class="me-3 text-center">
                                             <button class="vote-btn" onclick="voteAnswer(${answer.id}, 'upvote')">
                                                 <i class="bi bi-caret-up-fill"></i>
@@ -446,23 +440,35 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `).join('')}
+                        </div>
                     </div>
-                    
-                    <div id="answerForm" style="display: none;">
-                        <hr>
-                        <h6>Your Answer</h6>
+                    <div id="answerForm" class="mb-2">
+                        <h6>Submit Your Answer</h6>
                         <div id="answerEditor" style="height: 150px;"></div>
-                        <div class="mt-3">
+                        <div class="mt-2">
                             <button class="btn btn-primary" onclick="submitAnswer(${question.id})">
-                                <i class="bi bi-send"></i> Post Answer
+                                <i class="bi bi-send"></i> Submit
                             </button>
-                            <button class="btn btn-secondary" onclick="hideAnswerForm()">Cancel</button>
                         </div>
                     </div>
                 `;
-                
+                // Always show answer form, initialize Quill
+                if (window.answerQuill) {
+                    window.answerQuill.destroy();
+                }
+                window.answerQuill = new Quill('#answerEditor', {
+                    theme: 'snow',
+                    placeholder: 'Write your answer...',
+                    modules: {
+                        toolbar: [
+                            ['bold', 'italic', 'underline'],
+                            ['code-block', 'blockquote'],
+                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                            ['link']
+                        ]
+                    }
+                });
                 const modal = new bootstrap.Modal(document.getElementById('questionDetailModal'));
                 modal.show();
             })
