@@ -14,6 +14,7 @@ import os
 import re
 from functools import wraps
 from dotenv import load_dotenv
+import click
 
 load_dotenv()
 
@@ -274,33 +275,36 @@ def index():
 @handle_errors
 def register():
     if request.method == "POST":
-        data = request.get_json() if request.is_json else request.form
-
-        name = data.get("name", "").strip()
-        email = data.get("email", "").strip()
-        password = data.get("password", "")
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "").strip()
 
         # Validation
-        if not all([name, email, password]):
-            raise ValidationError("All fields are required")
-
-        if len(name) < 2:
+        if not name or len(name) < 2:
             raise ValidationError("Name must be at least 2 characters long")
+        validate_email(email)
+        validate_password(password)
 
-        email = validate_email(email)
-        password = validate_password(password)
-
+        # Check if user already exists
         if User.query.filter_by(email=email).first():
             raise ValidationError("Email already registered")
 
+        # Check if this is the first user (make them admin)
+        is_first_user = User.query.count() == 0
+        user_role = "admin" if is_first_user else "user"
+
+        # Create user
         user = User(
-            name=name, email=email, password_hash=generate_password_hash(password)
+            name=name,
+            email=email,
+            password_hash=generate_password_hash(password),
+            role=user_role
         )
         db.session.add(user)
         db.session.commit()
 
         login_user(user)
-        return jsonify({"message": "Registration successful"}), 201
+        return redirect(url_for("index"))
 
     return render_template("register.html")
 
@@ -654,29 +658,55 @@ def internal_error(error):
 # Initialize database and create default tags
 @app.cli.command("init-db")
 def init_db():
+    """Initialize the database with tables and sample data"""
     db.create_all()
 
-    # Create default tags
+    # Create sample tags if they don't exist
     default_tags = [
-        "Python",
-        "JavaScript",
-        "Flask",
-        "React",
-        "Database",
-        "API",
-        "Frontend",
-        "Backend",
-        "DevOps",
-        "Testing",
+        {"name": "Python", "color": "#3776ab"},
+        {"name": "JavaScript", "color": "#f7df1e"},
+        {"name": "Flask", "color": "#000000"},
+        {"name": "React", "color": "#61dafb"},
+        {"name": "Database", "color": "#336791"},
+        {"name": "API", "color": "#ff6b35"},
+        {"name": "Frontend", "color": "#e34c26"},
+        {"name": "Backend", "color": "#68217a"},
     ]
 
-    for tag_name in default_tags:
-        if not Tag.query.filter_by(name=tag_name).first():
-            tag = Tag(name=tag_name)
+    for tag_data in default_tags:
+        if not Tag.query.filter_by(name=tag_data["name"]).first():
+            tag = Tag(name=tag_data["name"], color=tag_data["color"])
             db.session.add(tag)
 
     db.session.commit()
-    print("Database initialized with default tags!")
+    print("Database initialized successfully!")
+
+
+@app.cli.command("make-admin")
+@click.argument("email")
+def make_admin(email):
+    """Make a user admin by email address"""
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        print(f"User with email {email} not found")
+        return
+    
+    user.role = "admin"
+    db.session.commit()
+    print(f"User {user.name} ({email}) is now an admin!")
+
+
+@app.cli.command("list-users")
+def list_users():
+    """List all users and their roles"""
+    users = User.query.all()
+    if not users:
+        print("No users found")
+        return
+    
+    print("Users:")
+    for user in users:
+        print(f"- {user.name} ({user.email}) - Role: {user.role}")
 
 
 if __name__ == "__main__":
