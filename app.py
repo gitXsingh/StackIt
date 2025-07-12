@@ -229,6 +229,40 @@ def format_answer_data(answer):
     }
 
 
+# Role-based permission decorators
+def require_role(required_role):
+    """Decorator to require specific user role"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                if required_role == 'guest':
+                    return f(*args, **kwargs)
+                return jsonify({'error': 'Login required'}), 401
+            
+            user_role = getattr(current_user, 'role', 'user')
+            role_hierarchy = {'guest': 0, 'user': 1, 'admin': 2}
+            
+            if role_hierarchy.get(user_role, 0) < role_hierarchy.get(required_role, 0):
+                return jsonify({'error': 'Insufficient permissions'}), 403
+                
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def guest_access(f):
+    """Allow guest access (view only)"""
+    return require_role('guest')(f)
+
+def user_access(f):
+    """Require user role or higher"""
+    return require_role('user')(f)
+
+def admin_access(f):
+    """Require admin role"""
+    return require_role('admin')(f)
+
+
 # Routes
 @app.route("/")
 def index():
@@ -345,6 +379,7 @@ def question_detail(question_id):
 
 # API Routes
 @app.route("/api/questions", methods=["GET"])
+@guest_access
 @handle_errors
 def get_questions():
     # Check cache first
@@ -372,7 +407,7 @@ def get_questions():
 
 
 @app.route("/api/questions", methods=["POST"])
-@login_required
+@user_access
 @handle_errors
 def create_question():
     data = request.get_json()
@@ -429,7 +464,7 @@ def get_question(question_id):
 
 
 @app.route("/api/questions/<int:question_id>/answers", methods=["POST"])
-@login_required
+@user_access
 @handle_errors
 def create_answer(question_id):
     question = Question.query.get_or_404(question_id)
@@ -454,7 +489,7 @@ def create_answer(question_id):
 
 
 @app.route("/answer/<int:answer_id>/vote", methods=["POST"])
-@login_required
+@user_access
 @handle_errors
 def vote_answer(answer_id):
     answer = Answer.query.get_or_404(answer_id)
@@ -477,7 +512,7 @@ def vote_answer(answer_id):
 
 
 @app.route("/api/answers/<int:answer_id>/accept", methods=["POST"])
-@login_required
+@user_access
 @handle_errors
 def accept_answer(answer_id):
     question = Answer.query.get_or_404(answer_id).question
@@ -565,6 +600,43 @@ def mark_all_notifications_read():
     )
     db.session.commit()
     return jsonify({"message": "All notifications marked as read"})
+
+
+# Add admin-only routes for content moderation
+@app.route("/api/admin/questions/<int:question_id>/delete", methods=["DELETE"])
+@admin_access
+@handle_errors
+def delete_question(question_id):
+    """Admin: Delete a question"""
+    question = Question.query.get_or_404(question_id)
+    db.session.delete(question)
+    db.session.commit()
+    return jsonify({"message": "Question deleted successfully"})
+
+@app.route("/api/admin/answers/<int:answer_id>/delete", methods=["DELETE"])
+@admin_access
+@handle_errors
+def delete_answer(answer_id):
+    """Admin: Delete an answer"""
+    answer = Answer.query.get_or_404(answer_id)
+    db.session.delete(answer)
+    db.session.commit()
+    return jsonify({"message": "Answer deleted successfully"})
+
+@app.route("/api/admin/users/<int:user_id>/role", methods=["PUT"])
+@admin_access
+@handle_errors
+def update_user_role(user_id):
+    """Admin: Update user role"""
+    user = User.query.get_or_404(user_id)
+    new_role = request.json.get('role')
+    
+    if new_role not in ['guest', 'user', 'admin']:
+        raise ValidationError('Invalid role')
+    
+    user.role = new_role
+    db.session.commit()
+    return jsonify({"message": f"User role updated to {new_role}"})
 
 
 # Error handlers

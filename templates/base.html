@@ -119,11 +119,24 @@
                         <div class="dropdown-menu dropdown-menu-end p-2" id="notificationsDropdown" style="min-width: 300px; display: none;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fw-bold">Notifications</span>
-                                <button class="btn btn-sm btn-link" id="markAllReadBtn">Mark all as read</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="markAllNotificationsRead()">Mark all read</button>
                             </div>
-                            <div id="notificationsList"></div>
+                            <div id="notificationsList">
+                                <p class="text-muted text-center">No notifications</p>
+                            </div>
                         </div>
                     </li>
+                    {% if current_user.role == 'admin' %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-shield-check"></i> Admin
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="showUserManagement()"><i class="bi bi-people"></i> Manage Users</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="showContentModeration()"><i class="bi bi-flag"></i> Moderate Content</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             {% if current_user.avatar_url %}
@@ -134,6 +147,7 @@
                                 </span>
                             {% endif %}
                             <span>{{ current_user.username }}</span>
+                            <small class="text-muted ms-1">({{ current_user.role|title }})</small>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                             <li><a class="dropdown-item" href="#" onclick="showProfileModal()"><i class="bi bi-person"></i> Profile</a></li>
