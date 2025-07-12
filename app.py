@@ -473,14 +473,21 @@ def get_question(question_id):
 @user_access
 @handle_errors
 def create_answer(question_id):
+    """Create a new answer for a question"""
     question = Question.query.get_or_404(question_id)
-    data = request.get_json()
+    
+    # Handle both JSON and form data
+    if request.is_json:
+        description = request.json.get("description", "").strip()
+    else:
+        description = request.form.get("description", "").strip()
 
-    description = data.get("description", "").strip()
     validate_answer_data(description)
 
     answer = Answer(
-        description=description, question_id=question_id, user_id=current_user.id
+        description=description,
+        question_id=question_id,
+        user_id=current_user.id
     )
     db.session.add(answer)
     db.session.commit()
@@ -488,10 +495,11 @@ def create_answer(question_id):
     # Create notification for question author
     if question.user_id != current_user.id:
         create_notification(
-            question.user_id, f"New answer to your question: {question.title}"
+            question.user_id,
+            f"New answer on your question: {question.title}"
         )
 
-    return jsonify({"message": "Answer created successfully", "id": answer.id}), 201
+    return jsonify({"message": "Answer posted successfully", "answer_id": answer.id})
 
 
 @app.route("/answer/<int:answer_id>/vote", methods=["POST"])
