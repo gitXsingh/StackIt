@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+
+{% block title %}StackIt - Home{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 fw-bold mb-3">
+                    Welcome to StackIt
+                </h1>
+                <p class="lead mb-4">
+                    A minimal Q&A forum for structured, community-based learning. 
+                    Ask questions, share knowledge, and build your expertise.
+                </p>
+                {% if current_user.is_authenticated %}
+                    <button class="btn btn-light btn-lg" onclick="showAskQuestionModal()">
+                        <i class="bi bi-plus-circle"></i> Ask Your First Question
+                    </button>
+                {% else %}
+                    <a href="{{ url_for('register') }}" class="btn btn-light btn-lg me-3">
+                        <i class="bi bi-person-plus"></i> Get Started
+                    </a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-lg">
+                        <i class="bi bi-box-arrow-in-right"></i> Sign In
+                    </a>
+                {% endif %}
+            </div>
+            <div class="col-lg-4 text-center">
+                <i class="bi bi-stack" style="font-size: 8rem; opacity: 0.8;"></i>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<div class="container mt-5">
+    <!-- Filter and Search -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="input-group">
+                <input type="text" class="form-control" id="searchInput" placeholder="Search questions...">
+                <button class="btn btn-outline-secondary" type="button" onclick="searchQuestions()">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <select class="form-select" id="tagFilter" onchange="filterByTag()">
+                <option value="">All Tags</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Questions List -->
+    <div id="questionsContainer">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ask Question Modal -->
+<div class="modal fade" id="askQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-question-circle"></i> Ask a Question
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="askQuestionForm">
+                    <div class="mb-3">
+                        <label for="questionTitle" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="questionTitle" required 
+                               placeholder="What's your question? Be specific.">
+                    </div>
+                    <div class="mb-3">
+                        <label for="questionDescription" class="form-label">Description</label>
+                        <div id="questionEditor" style="height: 200px;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="questionTags" class="form-label">Tags</label>
+                        <select class="form-select" id="questionTags" multiple>
+                            <!-- Tags will be loaded dynamically -->
+                        </select>
+                        <div class="form-text">Select relevant tags to help others find your question.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuestion()">
+                    <i class="bi bi-send"></i> Post Question
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Question Detail Modal -->
+<div class="modal fade" id="questionDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="questionDetailTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="questionDetailBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let quill;
+    let currentQuestions = [];
+
+    // Initialize Quill editor
+    document.addEventListener('DOMContentLoaded', function() {
+        quill = new Quill('#questionEditor', {
+            theme: 'snow',
+            placeholder: 'Describe your question in detail...',
+            modules: {
+                toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    ['code-block', 'blockquote'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['link']
+                ]
+            }
+        });
+        
+        loadQuestions();
+        loadTags();
+    });
+
+    function loadQuestions() {
+        fetch('/api/questions')
+            .then(response => response.json())
+            .then(questions => {
+                currentQuestions = questions;
+                displayQuestions(questions);
+            })
+            .catch(error => {
+                console.error('Error loading questions:', error);
+                showAlert('Error loading questions', 'danger');
+            });
+    }
+
+    function displayQuestions(questions) {
+        const container = document.getElementById('questionsContainer');
+        
+        if (questions.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+                    <h4 class="mt-3">No questions yet</h4>
+                    <p class="text-muted">Be the first to ask a question!</p>
+                    <button class="btn btn-primary" onclick="showAskQuestionModal()">
+                        <i class="bi bi-plus-circle"></i> Ask Question
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = questions.map(question => `
+            <div class="card question-card mb-3" onclick="showQuestionDetail(${question.id})">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5 class="card-title">${question.title}</h5>
+                            <p class="card-text text-muted">${question.description.substring(0, 150)}${question.description.length > 150 ? '...' : ''}</p>
+                            <div class="mb-2">
+                                ${question.tags.map(tag => `
+                                    <span class="badge bg-primary tag-badge">${tag}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="text-muted small">
+                                <i class="bi bi-person"></i> ${question.author}<br>
+                                <i class="bi bi-calendar"></i> ${formatDate(question.created_at)}<br>
+                                <i class="bi bi-chat"></i> ${question.answers_count} answers
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function loadTags() {
+        fetch('/api/tags')
+            .then(response => response.json())
+            .then(tags => {
+                const tagFilter = document.getElementById('tagFilter');
+                const questionTags = document.getElementById('questionTags');
+                
+                tags.forEach(tag => {
+                    // Add to filter dropdown
+                    const filterOption = document.createElement('option');
+                    filterOption.value = tag.name;
+                    filterOption.textContent = tag.name;
+                    tagFilter.appendChild(filterOption);
+                    
+                    // Add to question form
+                    const formOption = document.createElement('option');
+                    formOption.value = tag.name;
+                    formOption.textContent = tag.name;
+                    questionTags.appendChild(formOption);
+                });
+            })
+            .catch(error => console.error('Error loading tags:', error));
+    }
+
+    function showAskQuestionModal() {
+        {% if not current_user.is_authenticated %}
+            showAlert('Please login to ask a question', 'warning');
+            return;
+        {% endif %}
+        
+        document.getElementById('askQuestionForm').reset();
+        quill.setText('');
+        const modal = new bootstrap.Modal(document.getElementById('askQuestionModal'));
+        modal.show();
+    }
+
+    function submitQuestion() {
+        const title = document.getElementById('questionTitle').value.trim();
+        const description = quill.root.innerHTML;
+        const selectedTags = Array.from(document.getElementById('questionTags').selectedOptions).map(option => option.value);
+        
+        if (!title || !description || description === '<p><br></p>') {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+        
+        fetch('/api/questions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                title: title,
+                description: description,
+                tags: selectedTags
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert(data.error, 'danger');
+            } else {
+                showAlert('Question posted successfully!', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('askQuestionModal')).hide();
+                loadQuestions();
+            }
+        })
+        .catch(error => {
+            console.error('Error posting question:', error);
+            showAlert('Error posting question', 'danger');
+        });
+    }
+
+    function showQuestionDetail(questionId) {
+        fetch(`/api/questions/${questionId}`)
+            .then(response => response.json())
+            .then(question => {
+                document.getElementById('questionDetailTitle').textContent = question.title;
+                
+                const body = document.getElementById('questionDetailBody');
+                body.innerHTML = `
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <span class="badge bg-secondary">${question.author}</span>
+                                <small class="text-muted ms-2">${formatDate(question.created_at)}</small>
+                            </div>
+                            <div>
+                                ${question.tags.map(tag => `
+                                    <span class="badge bg-primary">${tag}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="question-description">${question.description}</div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Answers (${question.answers.length})</h6>
+                        {% if current_user.is_authenticated %}
+                            <button class="btn btn-primary btn-sm" onclick="showAnswerForm(${question.id})">
+                                <i class="bi bi-plus-circle"></i> Add Answer
+                            </button>
+                        {% endif %}
+                    </div>
+                    
+                    <div id="answersContainer">
+                        ${question.answers.map(answer => `
+                            <div class="card mb-3 ${answer.is_accepted ? 'answer-accepted' : ''}">
+                                <div class="card-body">
+                                    <div class="d-flex">
+                                        <div class="me-3 text-center">
+                                            <button class="vote-btn" onclick="voteAnswer(${answer.id}, 'upvote')">
+                                                <i class="bi bi-caret-up-fill"></i>
+                                            </button>
+                                            <div class="vote-count">${answer.votes}</div>
+                                            <button class="vote-btn" onclick="voteAnswer(${answer.id}, 'downvote')">
+                                                <i class="bi bi-caret-down-fill"></i>
+                                            </button>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="answer-content">${answer.description}</div>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    ${answer.author} • ${formatDate(answer.created_at)}
+                                                    ${answer.is_accepted ? ' • <span class="text-success"><i class="bi bi-check-circle"></i> Accepted</span>' : ''}
+                                                </small>
+                                                {% if current_user.is_authenticated %}
+                                                    ${question.author === '{{ current_user.name }}' && !answer.is_accepted ? 
+                                                        `<button class="btn btn-sm btn-outline-success ms-2" onclick="acceptAnswer(${answer.id})">
+                                                            <i class="bi bi-check"></i> Accept
+                                                        </button>` : ''
+                                                    }
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div id="answerForm" style="display: none;">
+                        <hr>
+                        <h6>Your Answer</h6>
+                        <div id="answerEditor" style="height: 150px;"></div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary" onclick="submitAnswer(${question.id})">
+                                <i class="bi bi-send"></i> Post Answer
+                            </button>
+                            <button class="btn btn-secondary" onclick="hideAnswerForm()">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                
+                const modal = new bootstrap.Modal(document.getElementById('questionDetailModal'));
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Error loading question:', error);
+                showAlert('Error loading question details', 'danger');
+            });
+    }
+
+    function showAnswerForm(questionId) {
+        {% if not current_user.is_authenticated %}
+            showAlert('Please login to answer questions', 'warning');
+            return;
+        {% endif %}
+        
+        const answerForm = document.getElementById('answerForm');
+        answerForm.style.display = 'block';
+        
+        // Initialize Quill for answer
+        if (window.answerQuill) {
+            window.answerQuill.destroy();
+        }
+        window.answerQuill = new Quill('#answerEditor', {
+            theme: 'snow',
+            placeholder: 'Write your answer...',
+            modules: {
+                toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    ['code-block', 'blockquote'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['link']
+                ]
+            }
+        });
+    }
+
+    function hideAnswerForm() {
+        document.getElementById('answerForm').style.display = 'none';
+    }
+
+    function submitAnswer(questionId) {
+        const description = window.answerQuill.root.innerHTML;
+        
+        if (!description || description === '<p><br></p>') {
+            showAlert('Please write an answer', 'warning');
+            return;
+        }
+        
+        fetch(`/api/questions/${questionId}/answers`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                description: description
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert(data.error, 'danger');
+            } else {
+                showAlert('Answer posted successfully!', 'success');
+                hideAnswerForm();
+                // Reload the question to show the new answer
+                const questionId = document.querySelector('#questionDetailModal .modal-title').getAttribute('data-question-id');
+                showQuestionDetail(questionId);
+            }
+        })
+        .catch(error => {
+            console.error('Error posting answer:', error);
+            showAlert('Error posting answer', 'danger');
+        });
+    }
+
+    function voteAnswer(answerId, voteType) {
+        {% if not current_user.is_authenticated %}
+            showAlert('Please login to vote', 'warning');
+            return;
+        {% endif %}
+        
+        fetch(`/api/answers/${answerId}/vote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                vote_type: voteType
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert(data.error, 'danger');
+            } else {
+                // Update vote count in UI
+                const voteCountElement = document.querySelector(`[onclick="voteAnswer(${answerId}, '${voteType}')"]`).parentElement.querySelector('.vote-count');
+                voteCountElement.textContent = data.votes;
+            }
+        })
+        .catch(error => {
+            console.error('Error voting:', error);
+            showAlert('Error voting', 'danger');
+        });
+    }
+
+    function acceptAnswer(answerId) {
+        fetch(`/api/answers/${answerId}/accept`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert(data.error, 'danger');
+            } else {
+                showAlert('Answer accepted successfully!', 'success');
+                // Reload the question to show updated status
+                const questionId = document.querySelector('#questionDetailModal .modal-title').getAttribute('data-question-id');
+                showQuestionDetail(questionId);
+            }
+        })
+        .catch(error => {
+            console.error('Error accepting answer:', error);
+            showAlert('Error accepting answer', 'danger');
+        });
+    }
+
+    function filterByTag() {
+        const selectedTag = document.getElementById('tagFilter').value;
+        
+        if (!selectedTag) {
+            displayQuestions(currentQuestions);
+            return;
+        }
+        
+        const filteredQuestions = currentQuestions.filter(question => 
+            question.tags.includes(selectedTag)
+        );
+        displayQuestions(filteredQuestions);
+    }
+
+    function searchQuestions() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        
+        if (!searchTerm) {
+            displayQuestions(currentQuestions);
+            return;
+        }
+        
+        const filteredQuestions = currentQuestions.filter(question => 
+            question.title.toLowerCase().includes(searchTerm) ||
+            question.description.toLowerCase().includes(searchTerm)
+        );
+        displayQuestions(filteredQuestions);
+    }
+
+    // Global function for showing ask question modal
+    window.showAskQuestionModal = showAskQuestionModal;
+</script>
+{% endblock %} 
