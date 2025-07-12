@@ -719,9 +719,12 @@ def list_users():
         print(f"- {user.name} ({user.email}) - Role: {user.role}")
 
 
-if __name__ == "__main__":
-    with app.app_context():
+# Initialize database on startup
+def init_database():
+    """Initialize database tables and default data"""
+    try:
         db.create_all()
+        
         # Create default tags if they don't exist
         default_tags = [
             {"name": "Python", "color": "#3776ab"},
@@ -740,5 +743,14 @@ if __name__ == "__main__":
                 db.session.add(tag)
 
         db.session.commit()
-    
+        print("Database initialized successfully!")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+        db.session.rollback()
+
+# Initialize database when the app starts
+with app.app_context():
+    init_database()
+
+if __name__ == "__main__":
     app.run(debug=True)
