@@ -1,9 +1,12 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import re
+import json
+from functools import wraps
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +20,70 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Cache for frequently accessed data
+cache = {}
+
+# Validation utilities
+class ValidationError(Exception):
+    pass
+
+def validate_email(email):
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(pattern, email):
+        raise ValidationError('Invalid email format')
+    return email
+
+def validate_password(password):
+    """Validate password strength"""
+    if len(password) < 6:
+        raise ValidationError('Password must be at least 6 characters long')
+    return password
+
+def validate_question_data(title, description, tags):
+    """Validate question data"""
+    if not title or len(title.strip()) < 10:
+        raise ValidationError('Title must be at least 10 characters long')
+    if not description or len(description.strip()) < 20:
+        raise ValidationError('Description must be at least 20 characters long')
+    if not isinstance(tags, list):
+        raise ValidationError('Tags must be a list')
+    return True
+
+def validate_answer_data(description):
+    """Validate answer data"""
+    if not description or len(description.strip()) < 10:
+        raise ValidationError('Answer must be at least 10 characters long')
+    return True
+
+# Error handling decorator
+def handle_errors(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValidationError as e:
+            return jsonify({'error': str(e)}), 400
+        except Exception as e:
+            app.logger.error(f'Error in {f.__name__}: {str(e)}')
+            return jsonify({'error': 'An unexpected error occurred'}), 500
+    return decorated_function
+
+# Cache utilities
+def get_cached_data(key, ttl=300):
+    """Get data from cache with TTL"""
+    if key in cache:
+        data, timestamp = cache[key]
+        if datetime.now() - timestamp < timedelta(seconds=ttl):
+            return data
+        else:
+            del cache[key]
+    return None
+
+def set_cached_data(key, data):
+    """Set data in cache with timestamp"""
+    cache[key] = (data, datetime.now())
 
 # Data Models
 class User(UserMixin, db.Model):
@@ -83,6 +150,43 @@ class Notification(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Utility functions for reusable components
+def create_notification(user_id, message):
+    """Create a notification for a user"""
+    notification = Notification(user_id=user_id, message=message)
+    db.session.add(notification)
+    db.session.commit()
+    return notification
+
+def calculate_vote_count(answer):
+    """Calculate vote count for an answer"""
+    upvotes = sum(1 for vote in answer.votes if vote.vote_type == 'upvote')
+    downvotes = sum(1 for vote in answer.votes if vote.vote_type == 'downvote')
+    return upvotes - downvotes
+
+def format_question_data(question):
+    """Format question data for API response"""
+    return {
+        'id': question.id,
+        'title': question.title,
+        'description': question.description,
+        'author': question.author.name,
+        'created_at': question.created_at.isoformat(),
+        'answers_count': len(question.answers),
+        'tags': [tag.tag.name for tag in question.tags]
+    }
+
+def format_answer_data(answer):
+    """Format answer data for API response"""
+    return {
+        'id': answer.id,
+        'description': answer.description,
+        'author': answer.author.name,
+        'created_at': answer.created_at.isoformat(),
+        'is_accepted': answer.is_accepted,
+        'votes': calculate_vote_count(answer)
+    }
+
 # Routes
 @app.route('/')
 def index():
@@ -90,19 +194,27 @@ def index():
     return render_template('index.html', questions=questions)
 
 @app.route('/register', methods=['GET', 'POST'])
+@handle_errors
 def register():
     if request.method == 'POST':
         data = request.get_json() if request.is_json else request.form
         
-        name = data.get('name')
-        email = data.get('email')
-        password = data.get('password')
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
         
+        # Validation
         if not all([name, email, password]):
-            return jsonify({'error': 'All fields are required'}), 400
+            raise ValidationError('All fields are required')
+        
+        if len(name) < 2:
+            raise ValidationError('Name must be at least 2 characters long')
+        
+        email = validate_email(email)
+        password = validate_password(password)
         
         if User.query.filter_by(email=email).first():
-            return jsonify({'error': 'Email already registered'}), 400
+            raise ValidationError('Email already registered')
         
         user = User(
             name=name,
@@ -118,12 +230,16 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@handle_errors
 def login():
     if request.method == 'POST':
         data = request.get_json() if request.is_json else request.form
         
-        email = data.get('email')
-        password = data.get('password')
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+        
+        if not email or not password:
+            raise ValidationError('Email and password are required')
         
         user = User.query.filter_by(email=email).first()
         
@@ -143,7 +259,14 @@ def logout():
 
 # API Routes
 @app.route('/api/questions', methods=['GET'])
+@handle_errors
 def get_questions():
+    # Check cache first
+    cache_key = f"questions_{request.args.get('tag', 'all')}"
+    cached_data = get_cached_data(cache_key, ttl=60)
+    if cached_data:
+        return jsonify(cached_data)
+    
     tag_filter = request.args.get('tag')
     questions_query = Question.query
     
@@ -152,32 +275,25 @@ def get_questions():
     
     questions = questions_query.order_by(Question.created_at.desc()).all()
     
-    result = []
-    for question in questions:
-        question_data = {
-            'id': question.id,
-            'title': question.title,
-            'description': question.description,
-            'author': question.author.name,
-            'created_at': question.created_at.isoformat(),
-            'answers_count': len(question.answers),
-            'tags': [tag.tag.name for tag in question.tags]
-        }
-        result.append(question_data)
+    result = [format_question_data(question) for question in questions]
+    
+    # Cache the result
+    set_cached_data(cache_key, result)
     
     return jsonify(result)
 
 @app.route('/api/questions', methods=['POST'])
 @login_required
+@handle_errors
 def create_question():
     data = request.get_json()
     
-    title = data.get('title')
-    description = data.get('description')
+    title = data.get('title', '').strip()
+    description = data.get('description', '').strip()
     tags = data.get('tags', [])
     
-    if not title or not description:
-        return jsonify({'error': 'Title and description are required'}), 400
+    # Validation
+    validate_question_data(title, description, tags)
     
     question = Question(
         title=title,
@@ -199,9 +315,17 @@ def create_question():
         db.session.add(question_tag)
     
     db.session.commit()
+    
+    # Clear cache
+    cache.clear()
+    
+    # Create notification for other users
+    create_notification(1, f"New question posted: {title}")
+    
     return jsonify({'message': 'Question created successfully', 'id': question.id}), 201
 
 @app.route('/api/questions/<int:question_id>', methods=['GET'])
+@handle_errors
 def get_question(question_id):
     question = Question.query.get_or_404(question_id)
     
@@ -212,34 +336,20 @@ def get_question(question_id):
         'author': question.author.name,
         'created_at': question.created_at.isoformat(),
         'tags': [tag.tag.name for tag in question.tags],
-        'answers': []
+        'answers': [format_answer_data(answer) for answer in question.answers]
     }
-    
-    for answer in question.answers:
-        votes_count = sum(1 for vote in answer.votes if vote.vote_type == 'upvote') - \
-                     sum(1 for vote in answer.votes if vote.vote_type == 'downvote')
-        
-        answer_data = {
-            'id': answer.id,
-            'description': answer.description,
-            'author': answer.author.name,
-            'created_at': answer.created_at.isoformat(),
-            'is_accepted': answer.is_accepted,
-            'votes': votes_count
-        }
-        question_data['answers'].append(answer_data)
     
     return jsonify(question_data)
 
 @app.route('/api/questions/<int:question_id>/answers', methods=['POST'])
 @login_required
+@handle_errors
 def create_answer(question_id):
     question = Question.query.get_or_404(question_id)
     data = request.get_json()
     
-    description = data.get('description')
-    if not description:
-        return jsonify({'error': 'Answer description is required'}), 400
+    description = data.get('description', '').strip()
+    validate_answer_data(description)
     
     answer = Answer(
         description=description,
@@ -249,17 +359,22 @@ def create_answer(question_id):
     db.session.add(answer)
     db.session.commit()
     
+    # Create notification for question author
+    if question.user_id != current_user.id:
+        create_notification(question.user_id, f"New answer to your question: {question.title}")
+    
     return jsonify({'message': 'Answer created successfully', 'id': answer.id}), 201
 
 @app.route('/api/answers/<int:answer_id>/vote', methods=['POST'])
 @login_required
+@handle_errors
 def vote_answer(answer_id):
     answer = Answer.query.get_or_404(answer_id)
     data = request.get_json()
     
     vote_type = data.get('vote_type')  # 'upvote' or 'downvote'
     if vote_type not in ['upvote', 'downvote']:
-        return jsonify({'error': 'Invalid vote type'}), 400
+        raise ValidationError('Invalid vote type')
     
     # Check if user already voted
     existing_vote = Vote.query.filter_by(
@@ -286,13 +401,13 @@ def vote_answer(answer_id):
     db.session.commit()
     
     # Calculate new vote count
-    votes_count = sum(1 for vote in answer.votes if vote.vote_type == 'upvote') - \
-                 sum(1 for vote in answer.votes if vote.vote_type == 'downvote')
+    votes_count = calculate_vote_count(answer)
     
     return jsonify({'votes': votes_count})
 
 @app.route('/api/answers/<int:answer_id>/accept', methods=['POST'])
 @login_required
+@handle_errors
 def accept_answer(answer_id):
     answer = Answer.query.get_or_404(answer_id)
     question = answer.question
@@ -308,15 +423,31 @@ def accept_answer(answer_id):
     answer.is_accepted = True
     db.session.commit()
     
+    # Create notification for answer author
+    if answer.user_id != current_user.id:
+        create_notification(answer.user_id, f"Your answer was accepted for: {question.title}")
+    
     return jsonify({'message': 'Answer accepted successfully'})
 
 @app.route('/api/tags', methods=['GET'])
+@handle_errors
 def get_tags():
+    # Check cache
+    cached_tags = get_cached_data('tags', ttl=300)
+    if cached_tags:
+        return jsonify(cached_tags)
+    
     tags = Tag.query.all()
-    return jsonify([{'id': tag.id, 'name': tag.name, 'color': tag.color} for tag in tags])
+    result = [{'id': tag.id, 'name': tag.name, 'color': tag.color} for tag in tags]
+    
+    # Cache the result
+    set_cached_data('tags', result)
+    
+    return jsonify(result)
 
 @app.route('/api/notifications', methods=['GET'])
 @login_required
+@handle_errors
 def get_notifications():
     notifications = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).limit(10).all()
     return jsonify([{
@@ -328,6 +459,7 @@ def get_notifications():
 
 @app.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
 @login_required
+@handle_errors
 def mark_notification_read(notification_id):
     notification = Notification.query.get_or_404(notification_id)
     if notification.user_id != current_user.id:
@@ -336,6 +468,24 @@ def mark_notification_read(notification_id):
     notification.is_read = True
     db.session.commit()
     return jsonify({'message': 'Notification marked as read'})
+
+@app.route('/api/notifications/mark_all_read', methods=['POST'])
+@login_required
+@handle_errors
+def mark_all_notifications_read():
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({'is_read': True})
+    db.session.commit()
+    return jsonify({'message': 'All notifications marked as read'})
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'error': 'Resource not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return jsonify({'error': 'Internal server error'}), 500
 
 # Initialize database and create default tags
 @app.cli.command('init-db')
