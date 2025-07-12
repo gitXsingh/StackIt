@@ -22,7 +22,9 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv(
     "SECRET_KEY", "dev-secret-key-change-in-production"
 )
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///stackit.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "DATABASE_URL", "sqlite:///stackit.db"
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -712,4 +714,23 @@ def list_users():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        # Create default tags if they don't exist
+        default_tags = [
+            {"name": "Python", "color": "#3776ab"},
+            {"name": "JavaScript", "color": "#f7df1e"},
+            {"name": "Flask", "color": "#000000"},
+            {"name": "React", "color": "#61dafb"},
+            {"name": "Database", "color": "#336791"},
+            {"name": "API", "color": "#ff6b35"},
+            {"name": "Frontend", "color": "#e34c26"},
+            {"name": "Backend", "color": "#68217a"},
+        ]
+
+        for tag_data in default_tags:
+            if not Tag.query.filter_by(name=tag_data["name"]).first():
+                tag = Tag(name=tag_data["name"], color=tag_data["color"])
+                db.session.add(tag)
+
+        db.session.commit()
+    
     app.run(debug=True)
