@@ -1,62 +1,61 @@
-# StackIt - Minimal Q&A Forum
+# **StackIt – Minimalistic Q\&A Platform**
 
-A backend-first, lightweight Q&A platform for structured, community-based learning. Built for the Odoo Hackathon 2025.
+A backend-centric, lightweight Q\&A application designed to foster structured, community-driven knowledge sharing. Developed as part of **Odoo Hackathon 2025**.
 
-## 🚀 Features
+---
 
-### ✅ Core Features
-- **Authentication System** - Register/Login with secure password hashing
-- **Question Management** - Create, view, and manage questions with rich text
-- **Answer System** - Post answers with rich text editor (Quill.js)
-- **Voting System** - Upvote/downvote answers
-- **Tag System** - Categorize questions with tags and filter by them
-- **Accept Answers** - Question authors can mark answers as accepted
-- **Notifications** - Real-time notification system (optional/mocked)
+## 🚀 **Key Features**
 
-### 🎯 Technical Stack
-- **Backend**: Flask (Python)
-- **Database**: SQLite with SQLAlchemy ORM
-- **Frontend**: HTML/CSS + Bootstrap 5 + JavaScript
-- **Rich Text**: Quill.js
-- **Authentication**: Flask-Login with bcrypt
-- **UI/UX**: Modern, responsive design with Bootstrap icons
+### ✅ **Core Functionality**
 
-## 🛠️ Installation & Setup
+* **User Authentication** – Secure registration and login with bcrypt-based password hashing
+* **Question Management** – Post, view, and manage questions with rich-text formatting
+* **Answer System** – Provide answers using a modern WYSIWYG editor (Quill.js)
+* **Voting Mechanism** – Upvote/downvote answers to promote helpful content
+* **Tagging Support** – Categorize and filter questions with color-coded tags
+* **Answer Acceptance** – Mark the most helpful answer as accepted
+* **Notifications** – (Optional) Real-time updates for user interactions
+
+---
+
+## ⚙️ **Technology Stack**
+
+* **Backend**: Flask (Python)
+* **Database**: SQLite + SQLAlchemy ORM
+* **Frontend**: HTML, CSS, Bootstrap 5, JavaScript
+* **Rich Text Editor**: Quill.js
+* **Authentication**: Flask-Login + bcrypt
+* **Icons & UI**: Bootstrap Icons + responsive layouts
+
+---
+
+## 🛠️ **Setup & Installation**
 
 ### Prerequisites
-- Python 3.8+
-- pip
+
+* Python 3.8+
+* pip package manager
 
 ### Quick Start
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/gitXsingh/StackIt.git
-   cd StackIt
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/gitXsingh/StackIt.git
+cd StackIt
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-3. **Initialize the database**
-   ```bash
-   python app.py
-   ```
-   The database will be automatically created with default tags.
+# Initialize database and run app
+python app.py
+```
 
-4. **Run the application**
-   ```bash
-   python app.py
-   ```
+Visit: `http://localhost:5000` in your browser.
 
-5. **Access the application**
-   Open your browser and go to `http://localhost:5000`
+---
 
-## 📊 Database Schema
+## 📚 **Database Schema**
 
-### Core Models
 ```sql
 User(id, name, email, password_hash, role, created_at)
 Question(id, title, description, user_id, created_at, updated_at)
@@ -67,128 +66,131 @@ Vote(id, answer_id, user_id, vote_type, created_at)
 Notification(id, user_id, message, is_read, created_at)
 ```
 
-## 🔌 API Endpoints
+---
 
-### Authentication
-- `POST /register` - Create new user account
-- `POST /login` - Authenticate user
-- `GET /logout` - Logout user
+## 🔌 **API Overview**
 
-### Questions
-- `GET /api/questions` - Get all questions (with optional tag filter)
-- `POST /api/questions` - Create new question
-- `GET /api/questions/<id>` - Get specific question with answers
+### **Authentication**
 
-### Answers
-- `POST /api/questions/<id>/answers` - Add answer to question
-- `POST /api/answers/<id>/vote` - Vote on answer (upvote/downvote)
-- `POST /api/answers/<id>/accept` - Accept answer (question author only)
+* `POST /register` – Register a new user
+* `POST /login` – Log in with credentials
+* `GET /logout` – Log out current session
 
-### Tags & Notifications
-- `GET /api/tags` - Get all available tags
-- `GET /api/notifications` - Get user notifications
-- `POST /api/notifications/<id>/read` - Mark notification as read
+### **Questions**
 
-## 🎨 UI/UX Features
+* `GET /api/questions` – Retrieve all questions (filterable by tag)
+* `POST /api/questions` – Create a new question
+* `GET /api/questions/<id>` – View specific question with answers
 
-### Modern Design
-- **Responsive Layout** - Works on desktop, tablet, and mobile
-- **Bootstrap 5** - Modern CSS framework with components
-- **Bootstrap Icons** - Clean, consistent iconography
-- **Smooth Animations** - Hover effects and transitions
-- **Color-coded Tags** - Visual categorization system
+### **Answers**
 
-### User Experience
-- **Real-time Search** - Filter questions by title/description
-- **Tag Filtering** - Filter questions by tags
-- **Rich Text Editor** - Quill.js for questions and answers
-- **Voting System** - Intuitive upvote/downvote buttons
-- **Notification System** - Bell icon with dropdown
-- **Modal Dialogs** - Clean question/answer forms
+* `POST /api/questions/<id>/answers` – Add answer to question
+* `POST /api/answers/<id>/vote` – Vote (up/down) on an answer
+* `POST /api/answers/<id>/accept` – Mark answer as accepted
 
-## 🔒 Security Features
+### **Tags & Notifications**
 
-- **Password Hashing** - bcrypt for secure password storage
-- **Input Validation** - Client and server-side validation
-- **CSRF Protection** - Built-in Flask security
-- **Session Management** - Flask-Login for user sessions
-- **SQL Injection Protection** - SQLAlchemy ORM
+* `GET /api/tags` – List all tags
+* `GET /api/notifications` – Retrieve user notifications
+* `POST /api/notifications/<id>/read` – Mark a notification as read
 
-## 🏆 Hackathon Compliance
+---
 
-### ✅ Requirements Met
-- ✅ **No static JSON** - Real APIs and live database
-- ✅ **Clean, responsive UI** - Bootstrap with good layout & spacing
-- ✅ **Backend & DB Modeling** - Custom database + REST APIs
-- ✅ **Input Validation** - Client + server-side validation
-- ✅ **GitHub Used Properly** - Version control ready
-- ✅ **No Firebase/Supabase** - Custom backend implementation
-- ✅ **Demo Video Ready** - Working app with all features
+## 🎨 **UI/UX Highlights**
 
-### 🎯 Demo Features
-- User registration and login
-- Ask questions with rich text and tags
-- Answer questions with rich text editor
-- Vote on answers (upvote/downvote)
-- Accept answers (question author only)
-- Search and filter questions
-- Notification system
-- Responsive design on all devices
+* **Responsive Design** – Optimized for desktop, tablet, and mobile
+* **Interactive UI** – Smooth animations, transitions, and modal dialogs
+* **Tag System** – Color-coded tags for intuitive navigation
+* **Search & Filter** – Quickly locate questions by keywords or tags
+* **Notification Bell** – Dropdown with real-time alerts
+* **Rich Text Input** – Quill.js editor for both questions and answers
 
-## 🚀 Deployment
+---
 
-### Local Development
+## 🔐 **Security Features**
+
+* **Secure Password Storage** – bcrypt-based hashing
+* **Form Validation** – Client-side and server-side validation
+* **CSRF Protection** – Native Flask integration
+* **Session Management** – Powered by Flask-Login
+* **SQL Injection Defense** – SQLAlchemy ORM encapsulation
+
+---
+
+## 🏁 **Hackathon Readiness Checklist**
+
+* ✅ Fully functional backend (no static JSON)
+* ✅ Responsive and accessible UI
+* ✅ REST API integration with DB modeling
+* ✅ Robust input validations
+* ✅ Source controlled via GitHub
+* ✅ No third-party BaaS (Firebase/Supabase)
+* ✅ Complete working demo and video
+
+---
+
+## 🚀 **Deployment Instructions**
+
+### For Local Development
+
 ```bash
 python app.py
 ```
 
-### Production Deployment
-1. Set environment variables:
-   ```bash
-   export SECRET_KEY="your-secret-key-here"
-   export FLASK_ENV="production"
-   ```
+### For Production
 
-2. Use a production WSGI server:
-   ```bash
-   pip install gunicorn
-   gunicorn -w 4 -b 0.0.0.0:5000 app:app
-   ```
+```bash
+# Set environment variables
+export SECRET_KEY="your-secret-key"
+export FLASK_ENV="production"
 
-## 📝 Project Structure
+# Start with Gunicorn (production-ready server)
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+---
+
+## 📁 **Project Structure**
 
 ```
 StackIt/
-├── app.py                 # Main Flask application
-├── requirements.txt       # Python dependencies
-├── README.md             # Project documentation
-├── templates/            # HTML templates
-│   ├── base.html         # Base template with navigation
-│   ├── index.html        # Home page with questions
-│   ├── login.html        # Login page
-│   └── register.html     # Registration page
-└── stackit.db           # SQLite database (created on first run)
+├── app.py               # Main Flask application
+├── requirements.txt     # Dependency file
+├── README.md            # Project documentation
+├── templates/           # Jinja2 HTML templates
+│   ├── base.html
+│   ├── index.html
+│   ├── login.html
+│   └── register.html
+└── stackit.db           # SQLite DB (auto-generated)
 ```
 
-## 🤝 Contributing
+---
 
-This project was built for the Odoo Hackathon 2025. For contributions:
+## 🤝 **Contributing**
+
+Interested in contributing? Follow these steps:
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
+2. Create a new feature branch
+3. Commit and push your changes
 4. Submit a pull request
 
-## 📄 License
+---
 
-This project is built for educational purposes and the Odoo Hackathon 2025.
+## 📜 **License**
 
-## 🎉 Acknowledgments
+This project is open-source and developed solely for academic and hackathon purposes during Odoo Hackathon 2025.
 
-- **Odoo Hackathon 2025** - For the opportunity to build this project
-- **Flask Community** - For the excellent web framework
-- **Bootstrap Team** - For the responsive CSS framework
-- **Quill.js** - For the rich text editor
+---
+
+## 🙏 **Acknowledgments**
+
+* **Odoo Hackathon 2025** – For fostering innovation
+* **Flask & Python Community** – For a powerful development stack
+* **Bootstrap** – For responsive UI design
+* **Quill.js** – For enabling rich text interactions
 
 ---
 
