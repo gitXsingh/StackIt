@@ -269,6 +269,7 @@ def admin_access(f):
 # Routes
 @app.route("/")
 def index():
+    ensure_database_initialized()
     questions = Question.query.order_by(Question.created_at.desc()).all()
     return render_template("index.html", questions=questions)
 
@@ -388,6 +389,7 @@ def question_detail(question_id):
 @guest_access
 @handle_errors
 def get_questions():
+    ensure_database_initialized()
     # Check cache first
     cache_key = f"questions_{request.args.get('tag', 'all')}"
     cached_data = get_cached_data(cache_key, ttl=60)
@@ -555,6 +557,7 @@ def accept_answer(answer_id):
 @app.route("/api/tags", methods=["GET"])
 @handle_errors
 def get_tags():
+    ensure_database_initialized()
     # Check cache
     cached_tags = get_cached_data("tags", ttl=300)
     if cached_tags:
@@ -723,7 +726,9 @@ def list_users():
 def init_database():
     """Initialize database tables and default data"""
     try:
+        print("Starting database initialization...")
         db.create_all()
+        print("Database tables created successfully!")
         
         # Create default tags if they don't exist
         default_tags = [
@@ -741,12 +746,25 @@ def init_database():
             if not Tag.query.filter_by(name=tag_data["name"]).first():
                 tag = Tag(name=tag_data["name"], color=tag_data["color"])
                 db.session.add(tag)
+                print(f"Added tag: {tag_data['name']}")
 
         db.session.commit()
         print("Database initialized successfully!")
     except Exception as e:
         print(f"Error initializing database: {e}")
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
+
+# Function to ensure database is initialized before handling requests
+def ensure_database_initialized():
+    """Ensure database is initialized before handling requests"""
+    try:
+        # Try to query a table to check if it exists
+        Question.query.first()
+    except Exception as e:
+        print(f"Database not initialized, initializing now: {e}")
+        init_database()
 
 # Initialize database when the app starts
 with app.app_context():
