@@ -2,9 +2,11 @@
 
 A backend-first, lightweight Q\&A platform built during the Odoo Hackathon 2025. StackIt enables structured community-based learning by allowing users to ask and answer questions, vote on the best responses, and explore topics using tags — all through a clean, responsive UI and a custom backend.
 Demonstration video : https://drive.google.com/file/d/16dIEGNnsE3SxQT64p0MbIwnqbskGrBE6/view?usp=drivesdk
+
+<img width="3898" height="1893" alt="image" src="https://github.com/user-attachments/assets/5be7c296-abc5-4fa6-b418-d60054da7bca" />
 <img width="1522" height="834" alt="image" src="https://github.com/user-attachments/assets/37621e7e-36d4-4856-af17-85239ed170f2" />
 <img width="1920" height="975" alt="image" src="https://github.com/user-attachments/assets/4fcb8c7d-26a7-4d0a-bbbf-b34731acf5eb" />
-<img width="3898" height="1893" alt="image" src="https://github.com/user-attachments/assets/5be7c296-abc5-4fa6-b418-d60054da7bca" />
+
 
 
 ---
